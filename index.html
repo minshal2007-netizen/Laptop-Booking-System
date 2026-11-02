@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hardware Inventory & Maintenance</title>
+<style>
+:root{--bg:#eef1ee;--card:#fff;--tx:#1b2420;--mut:#5f6b65;--bd:#d8dfda;--ac:#0f6b57;--ac2:#e3f1ec;--ok:#1a7f45;--bad:#b83232;--warn:#a8650c;font-family:"Segoe UI",system-ui,sans-serif;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101613;--card:#18211d;--tx:#e6ede9;--mut:#93a39b;--bd:#2a3731;--ac:#4cc3a3;--ac2:#1d2f29;--ok:#4cc27d;--bad:#ef7676;--warn:#e0a24a}}
+:root[data-theme="dark"]{--bg:#101613;--card:#18211d;--tx:#e6ede9;--mut:#93a39b;--bd:#2a3731;--ac:#4cc3a3;--ac2:#1d2f29;--ok:#4cc27d;--bad:#ef7676;--warn:#e0a24a}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-size:15px;line-height:1.45}
+header{padding:14px 14px 0}h1{font-size:19px;margin:0 0 10px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:0 14px 10px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:2}
+nav button{white-space:nowrap}
+main{padding:0 14px 40px;max-width:980px;margin:auto}
+button,select,input,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+button.s{padding:5px 9px;font-size:13px}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:10px}
+.k b{display:block;font-size:26px}.k span{color:var(--mut);font-size:13px}
+.bad b{color:var(--bad)}.warn b{color:var(--warn)}.ok b{color:var(--ok)}
+.bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.bar i{display:block;height:16px;background:var(--ac);border-radius:4px;min-width:3px}.bar span:first-child{width:70px;flex:none}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;background:var(--ac2);margin-right:4px}
+.tag.Faulty,.tag.Out{background:var(--bad);color:#fff}.tag.In-Repair,.tag.Expiring{background:var(--warn);color:#fff}.tag.Retired{background:var(--mut);color:#fff}
+.filters{display:grid;gap:6px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:10px}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.acts{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.dim{opacity:.55}.mut{color:var(--mut);font-size:13px}
+#m{position:fixed;inset:0;background:#0008;display:none;z-index:9;overflow:auto;padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px))}
+#m .card{max-width:560px;margin:0 auto}label{display:block;font-size:13px;color:var(--mut);margin-top:8px}
+label input,label select,label textarea{width:100%;margin-top:2px}
+textarea{width:100%;height:240px;font-family:monospace;font-size:12px}
+dt{font-weight:600;margin-top:8px}dd{margin:0;color:var(--mut)}
+</style></head><body>
+<header><h1>💻 Hardware Inventory & Maintenance</h1></header>
+<nav id="nav"></nav><main id="v"></main><div id="m"></div>
+<script>
+const KEY="ef101p11_v1",NOW=new Date(),TODAY=NOW.toISOString().slice(0,10);
+const STATUS=["Operational","Faulty","In Repair","Retired"],CATS=["Disk failure","RAM fault","Overheating","OS corruption","Power supply","Network issue","Display fault"];
+const CPUS=[["Core i3","Intel Core i3-10100"],["Core i5","Intel Core i5-10500"],["Core i5","Intel Core i5-12400"],["Core i7","Intel Core i7-11700"],["Core i7","Intel Core i7-12700"],["Ryzen 5","AMD Ryzen 5 5600"],["Ryzen 7","AMD Ryzen 7 5700G"],["Apple M","Apple M1"]];
+const MODELS=[["Dell","OptiPlex 7090"],["HP","EliteDesk 800 G6"],["Lenovo","ThinkCentre M90q"],["Lenovo","ThinkPad T14"],["Dell","Latitude 5520"],["HP","ProBook 450 G8"],["Asus","ExpertCenter D7"]];
+const LOCS=["Lab A","Lab B","Office 1","Server Room","Library"],OSES=["Windows 11 Pro","Windows 10 Pro","Ubuntu 22.04"];
+let S={assets:[],logs:[]},tab="dash",F={q:"",cpu:"",ram:"",st:"",loc:"",status:"",war:""};
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cls=s=>s.replace(/ /g,"-").replace("Out-of-warranty","Out").replace("Expiring-soon","Expiring");
+function seed(){let s=7;const r=()=>(s=(s*1664525+1013904223)%4294967296)/4294967296,pick=a=>a[Math.floor(r()*a.length)];
+ const a=[];for(let i=0;i<30;i++){const cpu=pick(CPUS),m=pick(MODELS),y=2021+Math.floor(r()*5),d=new Date(y,Math.floor(r()*12),1+Math.floor(r()*27)),w=new Date(d);w.setFullYear(w.getFullYear()+(r()<.3?1:3));
+  const st=pick(["SSD","SSD","NVMe","HDD"]);a.push({id:"PC-"+String(i+1).padStart(3,"0"),make:m[0],model:m[1],cpu:cpu[1],fam:cpu[0],ram:pick([8,16,16,32,64]),stype:st,scap:st=="HDD"?pick([500,1000]):pick([256,512,1000]),gpu:r()<.2?pick(["NVIDIA GTX 1650","NVIDIA RTX 3060"]):"Integrated",os:cpu[0]=="Apple M"?"macOS":pick(OSES),ip:"192.168.10."+(10+i),loc:pick(LOCS),purchase:d.toISOString().slice(0,10),warranty:w.toISOString().slice(0,10),status:i==29?"Retired":i%9==4?"Faulty":i%13==7?"In Repair":"Operational"})}
+ const L=[];for(let k=0;k<26;k++){const id=k<5?"PC-004":pick(a).id,cat=k<5?"Disk failure":pick(CATS),dt=new Date(NOW-r()*330*864e5).toISOString().slice(0,10);
+  L.push({id:"M"+(k+1),asset:id,date:dt,cat,fault:cat+" reported by user",action:pick(["Replaced component","Reinstalled OS","Cleaned and re-pasted","Firmware update","Replaced cable"]),tech:pick(["A. Rahman","S. Lee","M. Costa"]),cost:Math.round(r()*120)})}
+ return{assets:a,logs:L}}
+function load(){try{const x=localStorage.getItem(KEY);if(x){S=JSON.parse(x);return}}catch(e){}S=seed();save()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const fam=c=>{const x=CPUS.find(p=>p[1]==c);if(x)return x[0];const m=/(Core i\d|Ryzen \d|Xeon|Apple M)/i.exec(c);return m?m[1]:"Other"};
+const wst=a=>{const d=(new Date(a.warranty)-NOW)/864e5;return d<0?"Out of warranty":d<=60?"Expiring soon":"In warranty"};
+const logsOf=id=>S.logs.filter(l=>l.asset==id).sort((x,y)=>y.date.localeCompare(x.date));
+const attn=a=>a.status!="Retired"&&(a.status=="Faulty"||a.status=="In Repair"||wst(a)=="Expiring soon"||logsOf(a.id).length>=3);
+function count(arr,f){const m={};arr.forEach(x=>{const k=f(x);m[k]=(m[k]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1])}
+function bars(e){const mx=Math.max(1,...e.map(x=>x[1]));return e.map(([k,v])=>`<div class="bar"><span>${esc(k)}</span><i style="width:${v/mx*55}%"></i><span>${v}</span></div>`).join("")}
+function tabs(){const t=[["dash","Dashboard"],["assets","Assets"],["maint","Maintenance"],["help","Field guide"]];$("#nav").innerHTML=t.map(([k,n])=>`<button class="${tab==k?"on":""}" onclick="tab='${k}';draw()">${n}</button>`).join("")}
+function dash(){const A=S.assets,act=A.filter(a=>a.status!="Retired"),ops=act.filter(a=>a.status=="Operational").length,fl=act.filter(a=>a.status=="Faulty"||a.status=="In Repair").length,ow=act.filter(a=>wst(a)=="Out of warranty").length,at=act.filter(attn);
+ const ta=count(S.logs,l=>l.asset)[0],tc=count(S.logs,l=>l.cat)[0],cost=S.logs.reduce((s,l)=>s+(+l.cost||0),0);
+ return`<div class="grid"><div class="card k"><b>${A.length}</b><span>Total assets (${A.length-act.length} retired)</span></div><div class="card k ok"><b>${ops}</b><span>Operational</span></div><div class="card k bad"><b>${fl}</b><span>Faulty / in repair</span></div><div class="card k warn"><b>${ow}</b><span>Out of warranty</span></div><div class="card k warn"><b>${at.length}</b><span>Requiring attention</span></div></div>
+<div class="grid"><div class="card"><b>RAM size</b>${bars(count(act,a=>a.ram+" GB"))}</div><div class="card"><b>Storage type</b>${bars(count(act,a=>a.stype))}</div><div class="card"><b>Fault categories</b>${bars(count(S.logs,l=>l.cat))}</div></div>
+<div class="card"><b>Most frequent failures</b><p>Asset: <b>${ta?esc(ta[0]):"–"}</b> (${ta?ta[1]:0} events). Fault category: <b>${tc?esc(tc[0]):"–"}</b> (${tc?tc[1]:0} events). Total maintenance cost: <b>$${cost}</b>.</p></div>
+<div class="card"><b>Assets requiring attention</b><p class="mut">Faulty, in repair, warranty ending within 60 days, or 3+ maintenance events.</p>${at.map(a=>`<div class="row"><span>${esc(a.id)} · ${esc(a.make)} ${esc(a.model)} · ${esc(a.loc)}</span><span><span class="tag ${cls(a.status)}">${a.status}</span><span class="tag ${cls(wst(a))}">${wst(a)}</span></span></div>`).join("")||"<p>None.</p>"}</div>`}
+function opts(vals,cur,all){return(all?`<option value="">${all}</option>`:"")+vals.map(v=>`<option ${String(v)==String(cur)?"selected":""}>${esc(v)}</option>`).join("")}
+const uniq=f=>[...new Set(S.assets.map(f))].sort((a,b)=>a>b?1:-1);
+function filt(){const q=F.q.toLowerCase();return S.assets.filter(a=>(!q||JSON.stringify(a).toLowerCase().includes(q))&&(!F.cpu||fam(a.cpu)==F.cpu)&&(!F.ram||a.ram==F.ram)&&(!F.st||a.stype==F.st)&&(!F.loc||a.loc==F.loc)&&(!F.status||a.status==F.status)&&(!F.war||wst(a)==F.war))}
+function assets(){const L=filt();
+ return`<div class="row" style="margin-bottom:10px"><button class="p" onclick="aForm()">+ Add asset</button><button onclick="exp('assets')">Export inventory</button></div>
+<div class="filters"><input placeholder="Search…" value="${esc(F.q)}" oninput="F.q=this.value;list()" style="grid-column:1/-1">
+<select onchange="F.cpu=this.value;list()">${opts(uniq(a=>fam(a.cpu)),F.cpu,"CPU family")}</select>
+<select onchange="F.ram=this.value;list()">${opts(uniq(a=>a.ram).sort((a,b)=>a-b),F.ram,"RAM")}</select>
+<select onchange="F.st=this.value;list()">${opts(uniq(a=>a.stype),F.st,"Storage")}</select>
+<select onchange="F.loc=this.value;list()">${opts(uniq(a=>a.loc),F.loc,"Location")}</select>
+<select onchange="F.status=this.value;list()">${opts(STATUS,F.status,"Status")}</select>
+<select onchange="F.war=this.value;list()">${opts(["In warranty","Expiring soon","Out of warranty"],F.war,"Warranty")}</select></div><div id="lst">${rows(L)}</div>`}
+function rows(L){return`<p class="mut">${L.length} of ${S.assets.length} assets</p>`+L.map(a=>`<div class="card ${a.status=="Retired"?"dim":""}"><div class="row"><b>${esc(a.id)} · ${esc(a.make)} ${esc(a.model)}</b><span><span class="tag ${cls(a.status)}">${a.status}</span><span class="tag ${cls(wst(a))}">${wst(a)}</span></span></div>
+<div class="mut">${esc(a.cpu)} · ${a.ram} GB RAM · ${a.scap} GB ${a.stype} · ${esc(a.gpu)}<br>${esc(a.os)} · ${esc(a.ip||"no IP")} · ${esc(a.loc)}<br>Bought ${a.purchase} · warranty to ${a.warranty}</div>
+<div class="acts"><button class="s" onclick="aForm('${a.id}')">Edit</button><button class="s" onclick="hist('${a.id}')">History (${logsOf(a.id).length})</button><button class="s" onclick="lForm('${a.id}')">Log fault</button><button class="s" onclick="retire('${a.id}')">${a.status=="Retired"?"Reactivate":"Retire"}</button></div></div>`).join("")}
+function list(){$("#lst").innerHTML=rows(filt())}
+function maint(){const L=[...S.logs].sort((a,b)=>b.date.localeCompare(a.date));return`<div class="row" style="margin-bottom:10px"><button class="p" onclick="lForm()">+ Record event</button><button onclick="exp('logs')">Export maintenance</button></div>`+L.map(l=>`<div class="card"><div class="row"><b>${esc(l.asset)} · ${esc(l.cat)}</b><span class="mut">${l.date}</span></div><div>${esc(l.fault)}</div><div class="mut">Action: ${esc(l.action)} · ${esc(l.tech)} · $${l.cost||0}</div></div>`).join("")}
+function help(){const d=[["Asset ID vs IP address","Asset ID is a permanent label for the physical device, used for tracking and audits. An IP address is a network address that can change, so it can't identify the machine."],["RAM vs storage","RAM is short-term working memory; more RAM means smoother multitasking. Storage keeps files and the OS permanently."],["CPU vs GPU","The CPU runs general program logic. The GPU handles parallel graphics and compute work, needed for design, video and AI."],["SSD vs HDD","SSDs (and NVMe) have no moving parts and are much faster and sturdier. HDDs are cheaper per GB but slower and fail more often mechanically."],["Warranty records","They show whether the vendor pays for repairs. Tracking expiry helps decide to claim, renew or replace."],["Maintenance history","Repeat faults on one asset or category reveal bad batches, ageing hardware or environment problems (heat, power), which supports repair-or-replace and budgeting decisions."],["Operational status","Operational, Faulty, In Repair and Retired show what's usable now and keep retired devices on record without deleting them."]];
+ return`<div class="card"><dl>${d.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join("")}</dl></div><div class="card"><button onclick="if(confirm('Reset all data to the demo set?')){S=seed();save();draw()}">Reset demo data</button></div>`}
+function draw(){tabs();$("#v").innerHTML={dash,assets,maint,help}[tab]();scrollTo(0,0)}
+function modal(h){$("#m").innerHTML=`<div class="card">${h}</div>`;$("#m").style.display="block"}
+function close_(){$("#m").style.display="none"}
+const inp=(id,l,v,t="text")=>`<label>${l}<input id="f_${id}" type="${t}" value="${esc(v)}"></label>`,sel=(id,l,o,v)=>`<label>${l}<select id="f_${id}">${opts(o,v)}</select></label>`;
+function aForm(id){const e=S.assets.find(a=>a.id==id),a=e||{id:"PC-"+String(S.assets.length+1).padStart(3,"0"),make:"",model:"",cpu:"",ram:16,stype:"SSD",scap:512,gpu:"Integrated",os:"Windows 11 Pro",ip:"",loc:LOCS[0],purchase:TODAY,warranty:TODAY,status:"Operational"};
+ modal(`<b>${e?"Edit":"Add"} asset</b>${inp("id","Asset ID",a.id)}${inp("make","Manufacturer",a.make)}${inp("model","Model",a.model)}${inp("cpu","CPU (e.g. Intel Core i5-12400)",a.cpu)}${inp("ram","RAM (GB)",a.ram,"number")}${sel("stype","Storage type",["SSD","NVMe","HDD"],a.stype)}${inp("scap","Storage capacity (GB)",a.scap,"number")}${inp("gpu","GPU",a.gpu)}${inp("os","Operating system",a.os)}${inp("ip","IP address (optional)",a.ip)}${inp("loc","Location",a.loc)}${inp("purchase","Purchase date",a.purchase,"date")}${inp("warranty","Warranty end date",a.warranty,"date")}${sel("status","Operational status",STATUS,a.status)}<p id="err" style="color:var(--bad)"></p><div class="acts"><button class="p" onclick="aSave('${e?e.id:""}')">Save asset</button><button onclick="close_()">Cancel</button></div>`)}
+function aSave(old){const g=k=>$("#f_"+k).value.trim(),a={};["id","make","model","cpu","gpu","os","ip","loc","purchase","warranty","status","stype"].forEach(k=>a[k]=g(k));a.ram=+g("ram");a.scap=+g("scap");a.fam=fam(a.cpu);
+ const er=!a.id||!a.model||!a.cpu||!a.purchase||!a.warranty?"ID, model, CPU and dates are required.":!(a.ram>0)?"RAM must be a positive number.":(a.id!=old&&S.assets.some(x=>x.id==a.id))?"That asset ID already exists.":"";
+ if(er){$("#err").textContent=er;return}
+ if(old){const i=S.assets.findIndex(x=>x.id==old);S.assets[i]=a;if(old!=a.id)S.logs.forEach(l=>{if(l.asset==old)l.asset=a.id})}else S.assets.push(a);save();close_();draw()}
+function retire(id){const a=S.assets.find(x=>x.id==id);a.status=a.status=="Retired"?"Operational":"Retired";save();draw()}
+function lForm(id){const ids=S.assets.map(a=>a.id);modal(`<b>Record maintenance event</b>${sel("asset","Asset",ids,id||ids[0])}${inp("date","Date",TODAY,"date")}${sel("cat","Fault category",CATS,CATS[0])}${inp("fault","Fault description","")}${inp("action","Action taken","")}${inp("tech","Technician","")}${inp("cost","Cost (optional)",0,"number")}${sel("status","Set asset status to",STATUS,"Operational")}<p id="err" style="color:var(--bad)"></p><div class="acts"><button class="p" onclick="lSave()">Save event</button><button onclick="close_()">Cancel</button></div>`)}
+function lSave(){const g=k=>$("#f_"+k).value.trim();if(!g("fault")||!g("action")||!g("date")){$("#err").textContent="Date, fault and action are required.";return}
+ S.logs.push({id:"M"+Date.now(),asset:g("asset"),date:g("date"),cat:g("cat"),fault:g("fault"),action:g("action"),tech:g("tech")||"–",cost:+g("cost")||0});S.assets.find(a=>a.id==g("asset")).status=g("status");save();close_();draw()}
+function hist(id){const L=logsOf(id);modal(`<b>${esc(id)} maintenance history</b><p class="mut">${L.length} events · total cost $${L.reduce((s,l)=>s+(+l.cost||0),0)}</p>`+(L.map(l=>`<div class="card"><b>${l.date} · ${esc(l.cat)}</b><div>${esc(l.fault)}</div><div class="mut">${esc(l.action)} · ${esc(l.tech)} · $${l.cost||0}</div></div>`).join("")||"<p>No events recorded.</p>")+`<button onclick="close_()">Close</button>`)}
+function csv(rows){const k=Object.keys(rows[0]||{});return[k.join(","),...rows.map(r=>k.map(c=>'"'+String(r[c]??"").replace(/"/g,'""')+'"').join(","))].join("\n")}
+function exp(w){const t=csv(w=="assets"?S.assets.map(({fam,...r})=>r):S.logs);modal(`<b>Export ${w=="assets"?"inventory":"maintenance"} (CSV)</b><p class="mut">Copy this text and paste it into a .csv file or spreadsheet.</p><textarea id="ta" readonly>${esc(t)}</textarea><div class="acts"><button class="p" onclick="cp()">Copy CSV</button><button onclick="dl('${w}')">Download .csv</button><button onclick="close_()">Close</button></div>`)}
+function dl(w){try{const b=new Blob([$("#ta").value],{type:"text/csv"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=(w=="assets"?"inventory":"maintenance")+".csv";document.body.appendChild(a);a.click();a.remove()}catch(e){alert("Download not available here, use Copy CSV.")}}
+function cp(){const t=$("#ta");t.select();try{navigator.clipboard.writeText(t.value)}catch(e){try{document.execCommand("copy")}catch(e2){}}}
+load();draw();
+</script></body></html>
